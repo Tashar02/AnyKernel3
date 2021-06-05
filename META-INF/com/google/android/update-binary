@@ -43,23 +43,21 @@ find_slot() {
 setup_mountpoint() {
   [ -L $1 ] && $BB mv -f $1 ${1}_link;
   if [ ! -d $1 ]; then
-    $BB rm -f $1;
-    $BB mkdir -p $1;
+    rm -f $1;
+    mkdir -p $1;
   fi;
 }
 is_mounted() { $BB mount | $BB grep -q " $1 "; }
 mount_apex() {
   [ -d /system_root/system/apex ] || return 1;
-  local apex dest loop minorx num var;
+  local apex dest loop minorx num;
   setup_mountpoint /apex;
   minorx=1;
   [ -e /dev/block/loop1 ] && minorx=$($BB ls -l /dev/block/loop1 | $BB awk '{ print $6 }');
   num=0;
   for apex in /system_root/system/apex/*; do
     dest=/apex/$($BB basename $apex .apex);
-    case $dest in
-      *.current|*.release) dest=$(echo $dest | $BB rev | $BB cut -d. -f2- | $BB rev);;
-    esac;
+    [ "$dest" == /apex/com.android.runtime.release ] && dest=/apex/com.android.runtime;
     $BB mkdir -p $dest;
     case $apex in
       *.apex)
@@ -83,22 +81,13 @@ mount_apex() {
       *) $BB mount -o bind $apex $dest;;
     esac;
   done;
-  for var in $($BB grep -o 'export .* /.*' /system_root/init.environ.rc | $BB awk '{ print $2 }'); do
-    eval OLD_${var}=\$$var;
-  done;
-  $($BB grep -o 'export .* /.*' /system_root/init.environ.rc | $BB sed 's; /;=/;'); unset export;
+  export ANDROID_RUNTIME_ROOT=/apex/com.android.runtime;
+  export ANDROID_TZDATA_ROOT=/apex/com.android.tzdata;
+  export BOOTCLASSPATH=/apex/com.android.runtime/javalib/core-oj.jar:/apex/com.android.runtime/javalib/core-libart.jar:/apex/com.android.runtime/javalib/okhttp.jar:/apex/com.android.runtime/javalib/bouncycastle.jar:/apex/com.android.runtime/javalib/apache-xml.jar:/system/framework/framework.jar:/system/framework/ext.jar:/system/framework/telephony-common.jar:/system/framework/voip-common.jar:/system/framework/ims-common.jar:/system/framework/android.test.base.jar:/system/framework/telephony-ext.jar:/apex/com.android.conscrypt/javalib/conscrypt.jar:/apex/com.android.media/javalib/updatable-media.jar;
 }
 umount_apex() {
-  [ -d /apex/com.android.runtime ] || return 1;
-  local dest loop var;
-  for var in $($BB grep -o 'export .* /.*' /system_root/init.environ.rc | $BB awk '{ print $2 }'); do
-    if [ "$(eval echo \$OLD_$var)" ]; then
-      eval $var=\$OLD_${var};
-    else
-      eval unset $var;
-    fi;
-    unset OLD_${var};
-  done;
+  [ -d /apex ] || return 1;
+  local dest loop;
   for dest in $($BB find /apex -type d -mindepth 1 -maxdepth 1); do
     if [ -f $dest.img ]; then
       loop=$($BB mount | $BB grep $dest | $BB cut -d\  -f1);
@@ -107,6 +96,7 @@ umount_apex() {
     $BB losetup -d $loop) 2>/dev/null;
   done;
   $BB rm -rf /apex 2>/dev/null;
+  unset ANDROID_RUNTIME_ROOT ANDROID_TZDATA_ROOT BOOTCLASSPATH;
 }
 mount_all() {
   if ! is_mounted /cache; then
@@ -164,13 +154,13 @@ umount_all() {
   (if [ ! -d /postinstall/tmp ]; then
     $BB umount /system;
     $BB umount -l /system;
-  fi) 2>/dev/null;
-  umount_apex;
-  (if [ ! -d /postinstall/tmp ]; then
-    $BB umount /system_root;
-    $BB umount -l /system_root;
+    if [ -e /system_root ]; then
+      $BB umount /system_root;
+      $BB umount -l /system_root;
+    fi;
   fi;
-  umount /vendor; # busybox umount /vendor breaks recovery on some hacky devices
+  umount_apex;
+  umount /vendor; # busybox umount /vendor breaks recovery on some devices
   umount -l /vendor;
   for mount in /mnt/system /mnt/vendor /product /mnt/product /persist; do
     $BB umount $mount;
@@ -230,7 +220,6 @@ restore_env() {
   [ "$OLD_LD_PATH" ] && export LD_LIBRARY_PATH=$OLD_LD_PATH;
   [ "$OLD_LD_PRE" ] && export LD_PRELOAD=$OLD_LD_PRE;
   [ "$OLD_LD_CFG" ] && export LD_CONFIG_FILE=$OLD_LD_CFG;
-  unset OLD_LD_PATH OLD_LD_PRE OLD_LD_CFG;
   umount_all;
   [ -L /etc_link ] && $BB rm -rf /etc/*;
   (for dir in /apex /system /system_root /etc; do
@@ -266,7 +255,6 @@ abort() {
 do_devicecheck() {
   [ "$(file_getprop anykernel.sh do.devicecheck)" == 1 ] || return 1;
   local device devicename match product testname vendordevice vendorproduct;
-  ui_print "Checking device...";
   device=$(getprop ro.product.device 2>/dev/null);
   product=$(getprop ro.build.product 2>/dev/null);
   vendordevice=$(getprop ro.product.vendor.device 2>/dev/null);
@@ -274,14 +262,14 @@ do_devicecheck() {
   for testname in $(file_getprop anykernel.sh 'device.name.*'); do
     for devicename in $device $product $vendordevice $vendorproduct; do
       if [ "$devicename" == "$testname" ]; then
-        ui_print "$testname" " ";
+        ui_print "Device: $testname" " ";
         match=1;
         break 2;
       fi;
     done;
   done;
   if [ ! "$match" ]; then
-    abort " " "Unsupported device. Aborting...";
+    abort " " "Aborting! Unsupported device....";
   fi;
 }
 int2ver() {
@@ -296,7 +284,6 @@ int2ver() {
 do_versioncheck() {
   [ "$(file_getprop anykernel.sh supported.versions)" ] || return 1;
   local android_ver hi_ver lo_ver parsed_ver supported supported_ver;
-  ui_print "Checking Android version...";
   supported_ver=$(file_getprop anykernel.sh supported.versions | $BB tr -d '[:space:]');
   android_ver=$(file_getprop /system/build.prop ro.build.version.release);
   parsed_ver=$(int2ver $android_ver);
@@ -315,9 +302,9 @@ do_versioncheck() {
     done;
   fi;
   if [ "$supported" ]; then
-    ui_print "$android_ver" " ";
+    ui_print "Android version: $android_ver" " ";
   else
-    abort " " "Unsupported Android version. Aborting...";
+    abort " " "Aborting! Unsupported Android version....";
   fi;
 }
 do_levelcheck() {
@@ -371,7 +358,7 @@ do_modules() {
       umask=$(umask);
       umask 022;
       moddir=/data/adb/modules/ak3-helper;
-      $BB rm -rf $moddir;
+      rm -rf $moddir;
       mkdir -p system $moddir;
       ($BB mv -f product system;
       $BB mv -f vendor system) 2>/dev/null;
@@ -463,14 +450,16 @@ if [ -f banner ]; then
   ui_print " " " ";
 fi;
 
-KERNEL_STRING="$(file_getprop anykernel.sh kernel.string)";
-ui_print "$KERNEL_STRING";
+ui_print "Thanks to osm0sis @xda-developers for AnyKernel3" " ";
+
 if [ -f version ]; then
   ui_print " ";
   ui_printfile version;
   ui_print " ";
 fi;
-ui_print " " "AnyKernel3 by osm0sis @ xda-developers" " " " ";
+
+KERNEL_STRING="$(file_getprop anykernel.sh kernel.string)";
+ui_print "Kernel: $KERNEL_STRING";
 
 setup_env;
 
@@ -478,7 +467,7 @@ do_devicecheck;
 do_versioncheck;
 do_levelcheck;
 
-ui_print "Installing...";
+ui_print "Installation in progress....." " ";
 CORE=$($BB grep -oE 'ak.*core.sh' anykernel.sh);
 [ -f tools/$CORE ] || $BB ln -s $AKHOME/tools/ak*-core.sh $AKHOME/tools/$CORE;
 PATH="$AKHOME/bin:$PATH" home=$AKHOME $BB ash anykernel.sh $2;
@@ -487,12 +476,11 @@ if [ $? != 0 ]; then
 fi;
 
 do_modules;
-
 debugging;
 restore_env;
-
 if [ "$(file_getprop anykernel.sh do.cleanup)" == 1 ]; then
   cleanup;
 fi;
 
-ui_print " " " " "Done!";
+ui_print " " "Installation successfully completed";
+ui_print "Thank you for installing Tempest" " ";
