@@ -4,7 +4,7 @@
 ## AnyKernel setup
 # begin properties
 properties() { '
-kernel.string=Tempest 4.19 Edition
+kernel.string=Scarlet (k4.19)
 dev.string=Tashar
 do.devicecheck=1
 do.modules=0
@@ -13,6 +13,9 @@ do.cleanup=1
 do.cleanuponabort=0
 device.name1=jasmine_sprout
 device.name2=wayne
+device.name3=tulip
+device.name4=lavender
+device.name5=whyred
 supported.versions=9 - 12
 supported.patchlevels=
 '; } # end properties
