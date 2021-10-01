@@ -5,6 +5,12 @@
 # begin properties
 properties() { '
 kernel.string=ExampleKernel by osm0sis @ xda-developers
+kernel.for=KernelForDriver
+kernel.compiler=AtomSemx
+kernel.made=Kunmun
+kernel.version=4.19.xxx
+message.word=bruh
+build.date=2069
 do.devicecheck=1
 do.modules=0
 do.systemless=1
@@ -35,7 +41,6 @@ patch_vbmeta_flag=auto;
 # set permissions/ownership for included ramdisk files
 set_perm_recursive 0 0 755 644 $ramdisk/*;
 set_perm_recursive 0 0 750 750 $ramdisk/init* $ramdisk/sbin;
-
 
 ## AnyKernel boot install
 dump_boot;
