@@ -35,6 +35,10 @@ no_block_display=1;
 set_perm_recursive 0 0 755 644 $ramdisk/*;
 set_perm_recursive 0 0 750 750 $ramdisk/init* $ramdisk/sbin;
 
+ui_print "Patching system's build prop for fuse passthrough..." 
+# FUSE Passthrough
+patch_prop /system/build.prop "persist.sys.fuse.passthrough.enable" "true" 
+
 ## Begin AnyKernel install
 dump_boot;
 
