@@ -42,6 +42,11 @@ patch_vbmeta_flag=auto;
 set_perm_recursive 0 0 755 644 $ramdisk/*;
 set_perm_recursive 0 0 750 750 $ramdisk/init* $ramdisk/sbin;
 
+ui_print " ";
+ui_print "Patching system's build prop for FUSE Passthrough..." 
+# FUSE Passthrough
+patch_prop /system/build.prop "persist.sys.fuse.passthrough.enable" "true" 
+
 ## AnyKernel boot install
 dump_boot;
 
