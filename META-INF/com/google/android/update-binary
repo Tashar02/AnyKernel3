@@ -465,15 +465,17 @@ if [ -f banner ]; then
 fi;
 
 KERNEL_STRING="$(file_getprop anykernel.sh kernel.string)";
-ui_print "$KERNEL_STRING";
+DEV_STRING="$(file_getprop anykernel.sh dev.string)";
+ui_print " " "Kernel: $KERNEL_STRING";
+ui_print "Dev: $DEV_STRING" " ";
+
 if [ -f version ]; then
   ui_print " ";
   ui_printfile version;
   ui_print " ";
 fi;
-ui_print " " "AnyKernel3 by osm0sis @ xda-developers" " ";
-$BB grep -oE 'AK_BASE.*' META-INF/com/google/android/updater-script >&2;
-ui_print " ";
+
+ui_print "Thanks to osm0sis @ xda-developers for AnyKernel3" " ";
 
 setup_env;
 
@@ -498,4 +500,4 @@ if [ "$(file_getprop anykernel.sh do.cleanup)" == 1 ]; then
   cleanup;
 fi;
 
-ui_print " " " " "Done!";
+ui_print "Thanks for installing Scarlet-X" " ";
