@@ -5,7 +5,6 @@
 # begin properties
 properties() { '
 kernel.string=Scarlet-X
-kernel.for=EAS
 kernel.compiler=Neutron Clang 15
 kernel.made=Tashar
 kernel.version=4.19.240
