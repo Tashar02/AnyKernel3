@@ -10,7 +10,6 @@ kernel.compiler=Neutron Clang 15
 kernel.made=Tashar
 kernel.version=4.19.240
 message.word=Thank you for installing Scarlet-X
-build.date=$(date)
 do.devicecheck=1
 do.modules=0
 do.systemless=1
