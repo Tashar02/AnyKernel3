@@ -7,7 +7,6 @@ properties() { '
 kernel.string=Scarlet-X
 kernel.compiler=Neutron Clang 15
 kernel.made=Tashar
-kernel.version=4.19.240
 message.word=Thank you for installing Scarlet-X
 do.devicecheck=1
 do.modules=0
