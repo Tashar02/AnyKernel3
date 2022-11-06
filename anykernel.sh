@@ -42,14 +42,14 @@ set_perm_recursive 0 0 750 750 $ramdisk/init* $ramdisk/sbin;
 ui_print " ";
 # FUSE Passthrough
 android_ver=$(file_getprop /system/build.prop ro.build.version.release);
-if [ $android_ver -gt 11 ] && [ "$(getprop persist.sys.fuse.passthrough.enable)" != "true" ]; then
+fuse_passthrough=$(getprop persist.sys.fuse.passthrough.enable);
+if [ $android_ver -gt 11 ] && [ $fuse_passthrough != "true" ]; then
 	ui_print "Patching system's build prop for FUSE Passthrough..."
 	patch_prop /system/build.prop "persist.sys.fuse.passthrough.enable" "true"
-else if [ $android_ver -gt 11 ] && [ "$(getprop persist.sys.fuse.passthrough.enable)" = "true" ]; then
-	ui_print "FUSE Passthrough is already enabled! Ignoring build prop patching..."
 else
-	ui_print "FUSE Passthrough will remain disabled on Android Versions less than 12..."
-fi;
+	ui_print "Ignoring FUSE Passthrough installation..."
+	ui_print "Unsupported Android version or previously installed"
+fi
 
 ## AnyKernel boot install
 dump_boot;
