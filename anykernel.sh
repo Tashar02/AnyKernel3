@@ -42,12 +42,16 @@ ui_print " ";
 # FUSE Passthrough
 android_ver=$(file_getprop /system/build.prop ro.build.version.release);
 fuse_passthrough=$(getprop persist.sys.fuse.passthrough.enable);
+BBOX="$home/tools/busybox"
+
 if [ $android_ver -gt 11 ] && [ $fuse_passthrough != "true" ]; then
+	ui_print "Remounting /system as rw..."
+	$BBOX mount -o rw,remount /system
 	ui_print "Patching system's build prop for FUSE Passthrough..."
 	patch_prop /system/build.prop "persist.sys.fuse.passthrough.enable" "true"
 else
 	ui_print "Ignoring FUSE Passthrough installation..."
-	ui_print "Unsupported Android version or previously installed"
+	ui_print "Unsupported Android version or previously installed..."
 fi
 
 ## AnyKernel boot install
