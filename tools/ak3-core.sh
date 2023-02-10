@@ -330,7 +330,7 @@ flash_boot() {
           fi;
           $bin/magiskboot hexpatch kernel 736B69705F696E697472616D667300 77616E745F696E697472616D667300;
           if [ "$(file_getprop $home/anykernel.sh do.systemless)" == 1 ]; then
-            strings kernel | grep -E -m1 'Linux version.*#' > $home/vertmp;
+            strings kernel 2>/dev/null | grep -E -m1 'Linux version.*#' > $home/vertmp;
           fi;
           if [ "$comp" ]; then
             $bin/magiskboot compress=$comp kernel kernel.$comp;
@@ -428,7 +428,7 @@ flash_generic() {
   done;
 
   if [ "$img" -a ! -f ${1}_flashed ]; then
-    for path in /dev/block/bootdevice/by-name /dev/block/mapper; do
+    for path in /dev/block/mapper /dev/block/by-name /dev/block/bootdevice/by-name; do
       for file in $1 $1$slot; do
         if [ -e $path/$file ]; then
           imgblock=$path/$file;
@@ -439,6 +439,9 @@ flash_generic() {
     if [ ! "$imgblock" ]; then
       abort "$1 partition could not be found. Aborting...";
     fi;
+    if [ ! "$no_block_display" ]; then
+      ui_print " " "$imgblock";
+    fi;
     if [ "$path" == "/dev/block/mapper" ]; then
       avb=$($bin/httools_static avb $1);
       [ $? == 0 ] || abort "Failed to parse fstab entry for $1. Aborting...";
@@ -447,7 +450,7 @@ flash_generic() {
         [ $? == 0 ] || abort "Failed to parse top-level vbmeta. Aborting...";
         if [ "$flags" == "enabled" ]; then
           ui_print " " "dm-verity detected! Patching $avb...";
-          for avbpath in /dev/block/bootdevice/by-name /dev/block/mapper; do
+          for avbpath in /dev/block/mapper /dev/block/by-name /dev/block/bootdevice/by-name; do
             for file in $avb $avb$slot; do
               if [ -e $avbpath/$file ]; then
                 avbblock=$avbpath/$file;
@@ -460,14 +463,17 @@ flash_generic() {
           cd $home;
         fi
       fi
+      echo "Removing any existing $1_ak3..." >&2;
       $bin/lptools_static remove $1_ak3;
+      echo "Attempting to create $1_ak3..." >&2;
       if $bin/lptools_static create $1_ak3 $(wc -c < $img); then
+        echo "Replacing $1$slot with $1_ak3..." >&2;
         $bin/lptools_static unmap $1_ak3 || abort "Unmapping $1_ak3 failed. Aborting...";
         $bin/lptools_static map $1_ak3 || abort "Mapping $1_ak3 failed. Aborting...";
         $bin/lptools_static replace $1_ak3 $1$slot || abort "Replacing $1$slot failed. Aborting...";
         imgblock=/dev/block/mapper/$1_ak3;
       else
-        ui_print "Creating $1_ak3 failed. Attempting to resize $1$slot...";
+        echo "Creating $1_ak3 failed. Attempting to resize $1$slot..." >&2;
         $bin/httools_static umount $1 || abort "Unmounting $1 failed. Aborting...";
         if [ -e $path/$1-verity ]; then
           $bin/lptools_static unmap $1-verity || abort "Unmapping $1-verity failed. Aborting...";
@@ -482,9 +488,6 @@ flash_generic() {
     fi;
     isro=$(blockdev --getro $imgblock 2>/dev/null);
     blockdev --setrw $imgblock 2>/dev/null;
-    if [ ! "$no_block_display" ]; then
-      ui_print " " "$imgblock";
-    fi;
     if [ -f "$bin/flash_erase" -a -f "$bin/nandwrite" ]; then
       $bin/flash_erase $imgblock 0 0;
       $bin/nandwrite -p $imgblock $img;
@@ -685,10 +688,10 @@ patch_cmdline() {
   if ! grep -q "$1" $cmdfile; then
     cmdtmp=$(cat $cmdfile);
     echo "$cmdtmp $2" > $cmdfile;
-    sed -i -e 's;  *; ;g' -e 's;[ \t]*$;;' $cmdfile;
+    sed -i -e 's;^[ \t]*;;' -e 's;  *; ;g' -e 's;[ \t]*$;;' $cmdfile;
   else
     match=$(grep -o "$1.*$" $cmdfile | cut -d\  -f1);
-    sed -i -e "s;${match};${2};" -e 's;  *; ;g' -e 's;[ \t]*$;;' $cmdfile;
+    sed -i -e "s;${match};${2};" -e 's;^[ \t]*;;' -e 's;  *; ;g' -e 's;[ \t]*$;;' $cmdfile;
   fi;
   if [ -f "$home/cmdtmp" ]; then
     sed -i "s|^cmdline=.*|cmdline=$(cat $cmdfile)|" $split_img/header;
@@ -752,7 +755,7 @@ reset_ak() {
 
 # setup_ak
 setup_ak() {
-  local blockfiles parttype name part mtdmount mtdpart mtdname target;
+  local blockfiles plistboot plistinit plistreco parttype name part mtdmount mtdpart mtdname target;
 
   # slot detection enabled by is_slot_device=1 or auto (from anykernel.sh)
   case $is_slot_device in
@@ -764,6 +767,7 @@ setup_ak() {
         [ "$slot" ] || slot=$(grep -o 'androidboot.slot=.*$' /proc/cmdline | cut -d\  -f1 | cut -d= -f2);
         [ "$slot" ] && slot=_$slot;
       fi;
+      [ "$slot" == "normal" ] && unset slot;
       if [ "$slot" ]; then
         if [ -d /postinstall/tmp -a ! "$slot_select" ]; then
           slot_select=inactive;
@@ -823,17 +827,26 @@ setup_ak() {
     touch $blockfiles/current;
   fi;
 
-  # target block partition detection enabled by block=boot recovery init_boot vendor_boot or auto (from anykernel.sh)
+  # target block partition detection enabled by block=<partition filename> or auto (from anykernel.sh)
   case $block in
-     auto|"") block=boot;;
-  esac;
-  case $block in
-    boot|recovery|init_boot|vendor_boot)
+    /dev/*)
+      if [ "$slot" ] && [ -e "$block$slot" ]; then
+        target=$block$slot;
+      elif [ -e "$block" ]; then
+        target=$block;
+      fi;
+    ;;
+    *)
+      # maintain brief lists of historic matching partition type names for boot, recovery and init_boot/ramdisk
+      plistboot="boot BOOT LNX android_boot bootimg KERN-A kernel KERNEL";
+      plistreco="recovery RECOVERY SOS android_recovery recovery_ramdisk";
+      plistinit="init_boot ramdisk";
       case $block in
-        boot) parttype="boot BOOT LNX android_boot bootimg KERN-A kernel KERNEL";;
-        recovery) parttype="recovery RECOVERY SOS android_recovery";;
-        init_boot) parttype="init_boot";;
-        vendor_boot) parttype="vendor_boot";;
+        auto) parttype="$plistinit $plistboot";;
+        boot|kernel) parttype=$plistboot;;
+        recovery|recovery_ramdisk) parttype=$plistreco;;
+        init_boot|ramdisk) parttype=$plistinit;;
+        *) parttype=$block;;
       esac;
       for name in $parttype; do
         for part in $name$slot $name; do
@@ -845,9 +858,7 @@ setup_ak() {
             else
               abort "Unable to determine mtd $block partition. Aborting...";
             fi;
-            if [ -e /dev/mtd/$mtdname ]; then
-              target=/dev/mtd/$mtdname;
-            fi;
+            [ -e /dev/mtd/$mtdname ] && target=/dev/mtd/$mtdname;
           elif [ -e /dev/block/by-name/$part ]; then
             target=/dev/block/by-name/$part;
           elif [ -e /dev/block/bootdevice/by-name/$part ]; then
@@ -862,18 +873,13 @@ setup_ak() {
           [ "$target" ] && break 2;
         done;
       done;
-      if [ "$target" ]; then
-        block=$(ls $target 2>/dev/null);
-      else
-        abort "Unable to determine $block partition. Aborting...";
-      fi;
-    ;;
-    *)
-      if [ "$slot" ]; then
-        [ -e "$block$slot" ] && block=$block$slot;
-      fi;
     ;;
   esac;
+  if [ "$target" ]; then
+    block=$(ls $target 2>/dev/null);
+  else
+    abort "Unable to determine $block partition. Aborting...";
+  fi;
   if [ ! "$no_block_display" ]; then
     ui_print "$block";
   fi;
