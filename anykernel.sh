@@ -5,7 +5,7 @@
 # begin properties
 properties() { '
 kernel.string=Scarlet-X
-kernel.compiler=Neutron Clang 17
+kernel.compiler=Neutron Clang 17 x EVA GCC 14
 kernel.made=Tashar
 message.word=Thank you for installing Scarlet-X
 do.devicecheck=1
