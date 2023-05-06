@@ -77,7 +77,6 @@ busybox: GPLv2
 
 lptools_static: Apache License 2.0
 fec: Apache License 2.0
-snapshotupdater_static: Apache License 2.0
 
     Copyright their respective authors, (linked below).
 
@@ -96,9 +95,8 @@ snapshotupdater_static: Apache License 2.0
     Source not required, however, respective sources are provided:
     https://github.com/phhusson/vendor_lptools
     https://android.googlesource.com/platform/system/extras/+/master/verity/fec/
-    https://github.com/capntrips/SnapshotUpdater
 
-httools_static: MIT License
+httools_static: MIT
 
     Copyright (c) 2022 capntrips
 
