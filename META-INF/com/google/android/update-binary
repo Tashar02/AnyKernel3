@@ -14,7 +14,7 @@ $BOOTMODE || DIR=$(dirname "$ZIPFILE");
 [ $DIR == "/sideload" ] && DIR=/tmp;
 
 [ -d /postinstall/tmp ] && POSTINSTALL=/postinstall;
-[ "$AKHOME" ] || AKHOME=$POSTINSTALL/tmp/anykernel;
+[ "$AKHOME" ] || export AKHOME=$POSTINSTALL/tmp/anykernel;
 [ "$ANDROID_ROOT" ] || ANDROID_ROOT=/system;
 
 ui_print() {
@@ -54,9 +54,11 @@ setup_mountpoint() {
 is_mounted() { mount | grep -q " $1 "; }
 mount_apex() {
   [ -d /system_root/system/apex ] || return 1;
-  local apex dest loop minorx num var;
+  local apex dest loop minorx num shcon var;
   setup_mountpoint /apex;
   mount -t tmpfs tmpfs /apex -o mode=755 && touch /apex/apextmp;
+  shcon=$(cat /proc/self/attr/current);
+  echo "u:r:su:s0" > /proc/self/attr/current; # work around LOS Recovery not allowing loop mounts in recovery context
   minorx=1;
   [ -e /dev/block/loop1 ] && minorx=$(ls -l /dev/block/loop1 | awk '{ print $6 }');
   num=0;
@@ -82,12 +84,17 @@ mount_apex() {
           mount -t ext4 -o ro,loop,noatime $loop $dest && echo "$dest (loop)" >&2;
           if [ $? != 0 ]; then
             losetup -d $loop 2>/dev/null;
+            if [ $num -eq 64 -a $(losetup -f) == "/dev/block/loop0" ]; then
+              echo "Aborting apex mounts due to broken environment..." >&2;
+              break;
+            fi;
           fi;
         fi;
       ;;
       *) mount -o bind $apex $dest && echo "$dest (bind)" >&2;;
     esac;
   done;
+  echo "$shcon" > /proc/self/attr/current;
   for var in $(grep -o 'export .* /.*' /system_root/init.environ.rc | awk '{ print $2 }'); do
     eval OLD_${var}=\$$var;
   done;
@@ -109,7 +116,7 @@ umount_apex() {
   for dest in $(find /apex -type d -mindepth 1 -maxdepth 1); do
     loop=$(mount | grep $dest | grep loop | cut -d\  -f1);
     umount -l $dest;
-    [ "$loop" ] && losetup -d $loop;
+    losetup $loop >/dev/null 2>&1 && losetup -d $loop;
   done;
   [ -f /apex/apextmp ] && umount /apex;
   rm -rf /apex/apexak3 /apex 2>/dev/null;
@@ -210,11 +217,7 @@ setup_env() {
           fi;
         done;
       done;
-      if [ "$propval" ]; then
-        echo "$propval";
-      else
-        echo "";
-      fi;
+      echo "$propval";
     }
   elif [ ! "$(getprop ro.build.type 2>/dev/null)" ]; then
     getprop() {
@@ -241,6 +244,24 @@ restore_env() {
   done;
   umount -l /dev/random) 2>/dev/null;
 }
+setup_bb() {
+  local arch32 bb;
+  for arch32 in x86 arm; do
+    if [ -d $AKHOME/tools/$arch32 ]; then
+      bb=$AKHOME/tools/$arch32/busybox;
+      chmod 755 $bb;
+      $bb >/dev/null 2>&1;
+      if [ $? == 0 ]; then
+        $bb mv -f $AKHOME/tools/$arch32/* $AKHOME/tools;
+        break;
+      fi;
+    fi;
+  done;
+  bb=$AKHOME/tools/busybox;
+  chmod 755 $bb;
+  $bb chmod -R 755 tools bin;
+  $bb --install -s bin;
+}
 debugging() {
   local debug log path;
   case $(basename "$ZIPFILE" .zip) in
@@ -256,7 +277,7 @@ debugging() {
   fi;
 }
 cleanup() {
-  cd $(dirname $AKHOME);
+  cd $AKHOME/../;
   rm -rf $AKHOME;
 }
 abort() {
@@ -374,8 +395,8 @@ do_modules() {
   local block modcon moddir modtarget module slot umask;
   if [ "$(file_getprop anykernel.sh do.systemless)" == 1 ]; then
     cd $AKHOME/modules;
-    ui_print " " "Creating kernel helper Magisk module...";
-    if [ -d /data/adb/magisk -a -f $AKHOME/magisk_patched ]; then
+    ui_print " " "Creating kernel helper systemless module...";
+    if [ -d /data/adb/magisk -a -f $AKHOME/magisk_patched ] || [ -d /data/adb/ksu -a -f $AKHOME/kernelsu_patched ]; then
       umask=$(umask);
       umask 022;
       moddir=/data/adb/modules/ak3-helper;
@@ -389,7 +410,7 @@ do_modules() {
       cp -f $AKHOME/vertmp $moddir/version;
       umask $umask;
     else
-      ui_print "- Magisk installation not found. Skipped!";
+      ui_print "- Magisk/KernelSU installation not found. Skipped!";
     fi;
   else
     cd $AKHOME/modules;
@@ -447,26 +468,12 @@ unzip -o "$ZIPFILE";
 if [ $? != 0 -o ! "$(ls tools)" ]; then
   abort "Unzip failed. Aborting...";
 fi;
-for ARCH32 in x86 arm; do
-  if [ -d $AKHOME/tools/$ARCH32 ]; then
-    BB=$AKHOME/tools/$ARCH32/busybox;
-    chmod 755 $BB;
-    $BB >/dev/null 2>&1;
-    if [ $? == 0 ]; then
-      $BB mv -f $AKHOME/tools/$ARCH32/* $AKHOME/tools;
-      break;
-    fi;
-  fi;
-done;
-BB=$AKHOME/tools/busybox;
-chmod 755 $BB;
-$BB chmod -R 755 tools bin;
-$BB --install -s bin;
+setup_bb;
 if [ $? != 0 -o -z "$(ls bin)" ]; then
   abort "Busybox setup failed. Aborting...";
 fi;
 OLD_PATH="$PATH";
-export PATH="$AKHOME/bin:$PATH";
+export PATH="$AKHOME/bin:$AKHOME/tools:$PATH";
 
 if [ -f banner ]; then
   ui_printfile banner;
@@ -503,7 +510,7 @@ ui_print "Flashing $KERNEL_STRING Kernel...";
 # hack to maintain support for anykernel.sh files that weren't updated correctly along with the AK core
 CORE=$(grep -oE 'ak.*core.sh' anykernel.sh);
 [ -f tools/$CORE ] || ln -s $AKHOME/tools/ak*-core.sh $AKHOME/tools/$CORE;
-home=$AKHOME ash anykernel.sh;
+ash anykernel.sh;
 if [ $? != 0 ]; then
   abort;
 fi;
@@ -513,8 +520,6 @@ do_modules;
 debugging;
 restore_env;
 
-export PATH="$OLD_PATH";
-unset OLD_PATH;
 if [ "$(file_getprop anykernel.sh do.cleanup)" == 1 ]; then
   cleanup;
 fi;
@@ -522,3 +527,5 @@ fi;
 ui_print "- Done";
 ui_print " " "_________________________________________________";
 ui_print " " "$MESSAGE_WORD" "_________________________________________________" " ";
+export PATH="$OLD_PATH";
+unset OLD_PATH OUTFD ZIPFILE;
