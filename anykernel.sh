@@ -18,7 +18,7 @@ device.name2=tulip
 device.name3=jasmine_sprout
 device.name4=wayne
 device.name5=whyred
-supported.versions=9 - 13
+supported.versions=9 - 14
 supported.patchlevels=
 supported.vendorpatchlevels=
 '; } # end properties
