@@ -176,7 +176,7 @@ unpack_ramdisk() {
   cd $ramdisk;
   EXTRACT_UNSAFE_SYMLINKS=1 cpio -d -F $split_img/ramdisk.cpio -i;
   if [ $? != 0 -o ! "$(ls)" ]; then
-    echo "Unpacking ramdisk failed. But not aborting :)...";
+    echo "Unpacking ramdisk failed...";
   fi;
   if [ -d "$home/rdtmp" ]; then
     cp -af $home/rdtmp/* .;
@@ -330,7 +330,7 @@ flash_boot() {
         if [ $((magisk_patched & 3)) -eq 1 ]; then
           ui_print " " "! Magisk Detected !";
           ui_print "! Patching started. So, you need not worry about reflashing Magisk !";
-          ui_print "- Patching Kernel..." " ";
+          ui_print "- Patching kernel..." " ";
           comp=$($bin/magiskboot decompress kernel 2>&1 | grep -vE 'raw|zimage' | sed -n 's;.*\[\(.*\)\];\1;p');
           ($bin/magiskboot split $kernel || $bin/magiskboot decompress $kernel kernel) 2>/dev/null;
           if [ $? != 0 -a "$comp" ] && $comp --help 2>/dev/null; then

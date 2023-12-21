@@ -5,8 +5,10 @@
 # global properties
 properties() { '
 kernel.string=Scarlet-X
-kernel.compiler=Neutron Clang 17
-kernel.made=Tashar
+kernel.revision=4.19
+kernel.made=Tashar @ Atom-X-Devs
+anykernel3.made=osm0sis @ xda-developers
+kernel.compiler=Neutron Clang 18.0.0
 message.word=Thank you for installing Scarlet-X
 do.devicecheck=1
 do.modules=0
@@ -18,7 +20,7 @@ device.name2=tulip
 device.name3=jasmine_sprout
 device.name4=wayne
 device.name5=whyred
-supported.versions=9 - 14
+supported.versions=11-14
 supported.patchlevels=
 supported.vendorpatchlevels=
 '; } # end properties
@@ -37,24 +39,20 @@ is_slot_device=auto;
 ramdisk_compression=auto;
 patch_vbmeta_flag=auto;
 
-# import functions/variables and setup patching - see for reference (DO NOT REMOVE)
-. tools/ak3-core.sh;
-
+# begin passthrough patch
 ui_print " ";
-# FUSE Passthrough
-android_ver=$(file_getprop /system/build.prop ro.build.version.release);
-fuse_passthrough=$(getprop persist.sys.fuse.passthrough.enable);
-BBOX="$home/tools/busybox"
-
-if [ $android_ver -gt 11 ] && [ $fuse_passthrough != "true" ]; then
+passthrough() {
+if [ ! "$(getprop persist.sys.fuse.passthrough.enable)" ]; then
 	ui_print "Remounting /system as rw..."
-	$BBOX mount -o rw,remount /system
+	$home/tools/busybox mount -o rw,remount /system
 	ui_print "Patching system's build prop for FUSE Passthrough..."
 	patch_prop /system/build.prop "persist.sys.fuse.passthrough.enable" "true"
-else
-	ui_print "Ignoring FUSE Passthrough installation..."
-	ui_print "Unsupported Android version or previously installed..."
 fi
+} # end passthrough patch
+
+# import functions/variables and setup patching - see for reference (DO NOT REMOVE)
+. tools/ak3-core.sh && passthrough;
+
 
 ## AnyKernel boot install
 dump_boot;
