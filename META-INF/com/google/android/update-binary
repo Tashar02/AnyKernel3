@@ -343,9 +343,9 @@ do_versioncheck() {
   if [ "$supported" ]; then
     ui_print "- Current Android version: $android_ver is supported.";
     ui_print " ";
-    ui_print "Continuing With Flashing Process...";
+    ui_print "Continuing with flashing process...";
   else
-    abort "- Currently Android $android_ver is unsupported. This Kernel is only for Android $supported_ver. Aborting... !";
+    abort "- Currently Android $android_ver is unsupported. This kernel is only for Android $supported_ver. Aborting... !";
   fi;
 }
 do_levelcheck() {
@@ -478,7 +478,7 @@ do_modules() {
   fi
 
     cd $AKHOME/modules;
-    ui_print " " "Pushing modules...";
+    ui_print " " "- Pushing modules...";
     if [ -d /dev/block/mapper ]; then
       for block in system vendor product; do
         for slot in "" _a _b; do
@@ -550,21 +550,23 @@ fi;
 
 KERNEL_STRING="$(file_getprop anykernel.sh kernel.string)";
 KERNEL_REVISION="$(file_getprop anykernel.sh kernel.revision)";
-KERNEL_COMPILER="$(file_getprop anykernel.sh kernel.compiler)";
 KERNEL_MADE="$(file_getprop anykernel.sh kernel.made)";
-MESSAGE_WORD="$(file_getprop anykernel.sh message.word)";
+ANYKERNEL3_MADE="$(file_getprop anykernel.sh anykernel3.made)";
+KERNEL_COMPILER="$(file_getprop anykernel.sh kernel.compiler)";
 DEVICE_NAME="$(getprop ro.product.device)";
-ui_print "-- Kernel Revision : $KERNEL_REVISION";
-ui_print "-- Compiler        : $KERNEL_COMPILER";
-ui_print "-- Device          : $DEVICE_NAME";
-ui_print "-- Developer       : $KERNEL_MADE";
+MESSAGE_WORD="$(file_getprop anykernel.sh message.word)";
+ui_print "-- Kernel Revision      : $KERNEL_REVISION";
+ui_print "-- Kernel Developer     : $KERNEL_MADE";
+ui_print "-- AnyKernel3 Developer : $ANYKERNEL3_MADE";
+ui_print "-- Compiler             : $KERNEL_COMPILER";
+ui_print "-- Device               : $DEVICE_NAME";
 ui_print "_________________________________________________" " ";
 if [ -f version ]; then
   ui_print " ";
   ui_printfile version;
   ui_print " ";
 fi;
-ui_print "- Preparing Environment Setup ...";
+ui_print "- Preparing environmemt...";
 grep -oE 'AK_BASE.*' META-INF/com/google/android/updater-script >&2;
 ui_print " ";
 
@@ -576,7 +578,7 @@ do_levelcheck;
 do_vendorlevelcheck;
 
 ui_print " ";
-ui_print "Flashing $KERNEL_STRING Kernel...";
+ui_print "Flashing $KERNEL_STRING...";
 # hack to maintain support for anykernel.sh files that weren't updated correctly along with the AK core
 CORE=$(grep -oE 'ak.*core.sh' anykernel.sh);
 [ -f tools/$CORE ] || ln -s $AKHOME/tools/ak*-core.sh $AKHOME/tools/$CORE;
@@ -595,7 +597,7 @@ if [ "$(file_getprop anykernel.sh do.cleanup)" == 1 ]; then
   cleanup;
 fi;
 
-ui_print "- Done";
+ui_print "- Done!";
 ui_print " " "_________________________________________________";
 ui_print " " "$MESSAGE_WORD" "_________________________________________________" " ";
 export PATH="$OLD_PATH";

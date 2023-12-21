@@ -6,8 +6,9 @@
 properties() { '
 kernel.string=Scarlet-X
 kernel.revision=5.4
-kernel.compiler=AOSP Clang 17.0.4
-kernel.made=Tashar
+kernel.made=Tashar @ Atom-X-Devs
+anykernel3.made=osm0sis @ xda-developers
+kernel.compiler=Neutron Clang 18.0.0
 message.word=Thank you for installing Scarlet-X
 do.devicecheck=1
 do.modules=1
