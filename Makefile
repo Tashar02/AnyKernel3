@@ -12,7 +12,7 @@ $(ZIP):
 	@echo "Creating ZIP: $(ZIP)-signed.zip"
 	@zip -r9 "$@.zip" . -q -x $(EXCLUDE)
 	@echo "Signing zip with aosp keys..."
-	@java -jar *.jar* "$@.zip" "$@-signed.zip"
+	@java -jar *.jar* releasekey.x509.pem releasekey.pk8 "$@.zip" "$@-signed.zip"
 	@echo "Done!"
 
 # Cleaning

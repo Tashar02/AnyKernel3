@@ -3,3 +3,5 @@
 dtbo.img
 Image
 *.zip*
+*.pk8
+*.pem
