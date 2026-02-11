@@ -4,7 +4,7 @@ CODENAME ?= redwood
 DATE ?= $(shell date "+%H%M")
 
 ZIP := $(KNAME)-$(CODENAME)-$(DATE)
-EXCLUDE := Makefile *.git* *.jar* *placeholder* *.md* LICENSE FUNDING.yml
+EXCLUDE := Makefile *.git* *.jar* *placeholder* *.md* LICENSE FUNDING.yml releasekey*
 
 # Zipping
 zip: $(ZIP)
