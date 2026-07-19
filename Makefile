@@ -11,7 +11,7 @@ zip: $(ZIP)
 $(ZIP):
 	@echo "Creating ZIP: $(ZIP)-signed.zip"
 	@zip -r9 "$@.zip" . -q -x $(EXCLUDE)
-	@echo "Signing zip with aosp keys..."
+	@echo "Signing zip with release-keys..."
 	@java -jar *.jar* releasekey.x509.pem releasekey.pk8 "$@.zip" "$@-signed.zip"
 	@echo "Done!"
 
